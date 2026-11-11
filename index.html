@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f7fe">
+  <meta name="apple-mobile-web-app-title" content="LYRA">
+  <meta name="application-name" content="LYRA">
+  <title>LYRA</title>
+  <link rel="icon" href="favicon.ico" sizes="48x48">
+  <link rel="icon" href="img/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="device" id="app">
+
+    <!-- ───────────── Home ───────────── -->
+    <section class="page tabpage lib home" id="home" aria-label="Home">
+      <div class="scroll" id="home-scroll">
+        <p class="lib-note" id="home-note" hidden></p>
+        <div id="home-sections"></div>
+      </div>
+      <header class="topbar">
+        <h1 class="page-title">Home</h1>
+        <button class="search-btn" id="open-search" type="button" aria-label="Search">
+          <svg viewBox="0 0 24 24"><circle cx="10.6" cy="10.6" r="6.3"/><path d="m15.4 15.4 4.6 4.6"/></svg>
+        </button>
+      </header>
+    </section>
+
+    <!-- ───────────── Explore ───────────── -->
+    <section class="page tabpage explore" id="explore" aria-label="Explore">
+      <div class="wheel" id="wheel" tabindex="0" role="listbox" aria-label="Music collection">
+        <ul class="wheel-list" id="wheel-list"></ul>
+      </div>
+      <p class="wheel-status" id="wheel-status">Loading…</p>
+
+      <header class="topbar">
+        <h1 class="explore-title">Explore</h1>
+        <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      </header>
+
+    </section>
+
+    <!-- ───────────── Saved ───────────── -->
+    <section class="page tabpage lib saved" id="saved" aria-label="Saved">
+      <div class="scroll saved-scroll">
+        <div class="saved-view" id="view-liked" role="tabpanel" aria-labelledby="seg-liked">
+          <ul class="rows" id="saved-list"></ul>
+          <div class="empty" id="saved-empty" hidden>
+            <span class="empty-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M7.4 3.8h9.2a1.7 1.7 0 0 1 1.7 1.7v14.6L12 16.3l-6.3 3.8V5.5a1.7 1.7 0 0 1 1.7-1.7z"/></svg>
+            </span>
+            <p class="empty-title">No liked songs yet</p>
+            <p class="empty-text">Tap the bookmark next to any song to keep it here.</p>
+          </div>
+        </div>
+        <div class="saved-view" id="view-playlists" role="tabpanel" aria-labelledby="seg-playlists" hidden>
+          <h2 class="section-title">Your playlists</h2>
+          <ul class="rows" id="my-playlists"></ul>
+          <h2 class="section-title" id="featured-title">Popular playlists</h2>
+          <ul class="rows" id="featured-playlists"></ul>
+        </div>
+      </div>
+      <header class="topbar">
+        <h1 class="page-title">Saved</h1>
+        <span class="page-count" id="saved-count"></span>
+      </header>
+      <div class="seg" id="saved-seg" role="tablist" aria-label="Saved" data-active="liked">
+        <span class="seg-thumb" aria-hidden="true"></span>
+        <button class="seg-btn" type="button" role="tab" id="seg-liked" aria-controls="view-liked" aria-selected="true" data-view="liked">Liked songs</button>
+        <button class="seg-btn" type="button" role="tab" id="seg-playlists" aria-controls="view-playlists" aria-selected="false" tabindex="-1" data-view="playlists">Playlists</button>
+      </div>
+    </section>
+
+    <!-- ───────────── Tab bar (Home · Explore · Saved) ───────────── -->
+    <nav class="tabbar" id="tabbar" aria-label="Sections">
+      <button class="tab" type="button" data-tab="home" aria-label="Home">
+        <svg viewBox="0 0 24 24" class="tab-icon">
+          <path class="ic-body" d="M4.6 10.2 12 4.3l7.4 5.9v8.1a2.4 2.4 0 0 1-2.4 2.4H7a2.4 2.4 0 0 1-2.4-2.4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          <path class="ic-cut" d="M9.4 16.6c1.5 1.1 3.7 1.1 5.2 0" fill="none" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <button class="tab" type="button" data-tab="explore" aria-label="Explore">
+        <svg viewBox="0 0 24 24" class="tab-icon">
+          <circle class="ic-body" cx="12" cy="12" r="6.6" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M3.2 15.9c-1.3-1.9 2-4.9 7.3-6.7 5.3-1.9 10-2 10.9-.1.6 1.3-.9 3-3.5 4.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+          <path class="ic-mask" d="M5 16.9c1.6.6 5.3-.1 9.3-1.8" fill="none" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <button class="tab" type="button" data-tab="saved" aria-label="Saved">
+        <svg viewBox="0 0 24 24" class="tab-icon">
+          <path class="ic-body" d="M7.4 4.5h8.2a1.7 1.7 0 0 1 1.7 1.7v14.1l-5.8-3.7-5.8 3.7V6.2a1.7 1.7 0 0 1 1.7-1.7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M9.6 2.6h8.6a1.8 1.8 0 0 1 1.8 1.8v13.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </nav>
+
+    <!-- ───────────── Search ───────────── -->
+    <section class="page lib search" id="search" aria-label="Search">
+      <div class="scroll search-scroll">
+        <p class="search-status" id="search-status">Find songs and artists</p>
+        <ul class="rows" id="search-results"></ul>
+      </div>
+      <header class="topbar">
+        <button class="back" id="close-search" type="button" aria-label="Close search">
+          <svg viewBox="0 0 12 20"><path d="M9.5 2.5 2.5 10l7 7.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <label class="search-field">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.6" cy="10.6" r="6.3"/><path d="m15.4 15.4 4.6 4.6"/></svg>
+          <input id="search-input" type="search" placeholder="Songs, artists, albums" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Search songs">
+          <button class="search-clear" id="search-clear" type="button" aria-label="Clear search" hidden>
+            <svg viewBox="0 0 12 12"><path d="m3 3 6 6M9 3 3 9"/></svg>
+          </button>
+        </label>
+      </header>
+    </section>
+
+    <!-- ───────────── A playlist ───────────── -->
+    <section class="page lib plview" id="plview" aria-label="Playlist">
+      <div class="scroll">
+        <div class="pl-hero">
+          <span class="pl-cover" id="pl-cover"></span>
+          <h2 class="pl-name" id="pl-name"></h2>
+          <p class="pl-meta" id="pl-meta"></p>
+          <div class="pl-actions">
+            <button class="chip-btn is-primary" id="pl-play" type="button">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.4v9.2a.6.6 0 0 0 .92.5l7.2-4.6a.6.6 0 0 0 0-1L5.92 2.9a.6.6 0 0 0-.92.5z"/></svg>Play
+            </button>
+            <button class="chip-btn" id="pl-add" type="button">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.2v9.6M3.2 8h9.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Add songs
+            </button>
+          </div>
+        </div>
+        <ul class="rows" id="pl-tracks"></ul>
+        <p class="pl-empty" id="pl-empty" hidden>No songs yet. Tap Add songs to fill it.</p>
+      </div>
+      <header class="topbar">
+        <button class="back" id="pl-back" type="button" aria-label="Back to playlists">
+          <svg viewBox="0 0 12 20"><path d="M9.5 2.5 2.5 10l7 7.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="pl-more" id="pl-more" type="button" aria-label="Playlist options">
+          <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        </button>
+      </header>
+    </section>
+
+    <!-- ───────────── Now Playing ───────────── -->
+    <section class="page playing" id="playing" aria-label="Now playing">
+      <header class="topbar">
+        <button class="back" id="back" type="button" aria-label="Back">
+          <svg viewBox="0 0 12 20"><path d="M9.5 2.5 2.5 10l7 7.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="save np-save" id="np-save" type="button" aria-pressed="false" aria-label="Save">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.4 3.8h9.2a1.7 1.7 0 0 1 1.7 1.7v14.6L12 16.3l-6.3 3.8V5.5a1.7 1.7 0 0 1 1.7-1.7z"/></svg>
+        </button>
+      </header>
+
+      <div class="deck-wrap">
+        <svg class="deck" id="deck" viewBox="0 0 340 340" aria-hidden="false" role="img" aria-label="Turntable"></svg>
+      </div>
+
+      <div class="info">
+        <h2 class="np-title" id="np-title">One Week Last</h2>
+        <p class="np-artist" id="np-artist">Justin Bibber</p>
+      </div>
+
+      <div class="console">
+        <div class="dome" aria-hidden="true"></div>
+        <svg class="arc" id="arc" aria-hidden="true">
+          <path class="arc-played" id="arc-played"/>
+          <circle class="arc-thumb" id="arc-thumb" r="4"/>
+        </svg>
+        <div class="seek" id="seek" role="slider" tabindex="0" aria-label="Seek"
+             aria-valuemin="0" aria-valuemax="169" aria-valuenow="0" aria-valuetext="0:00 of 2:49"></div>
+
+        <div class="wave" id="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="time" id="time" aria-live="off">0:00 / 2:49</div>
+
+        <div class="controls">
+          <button class="pill-btn" id="prev" type="button" aria-label="Previous track">
+            <svg viewBox="0 0 16 16"><rect x="3" y="3.2" width="1.9" height="9.6" rx=".5"/><path d="M12.6 3.6v8.8a.6.6 0 0 1-.93.5L5.6 8.5a.6.6 0 0 1 0-1l6.07-4.4a.6.6 0 0 1 .93.5z"/></svg>
+          </button>
+          <button class="knob" id="knob" type="button" aria-label="Play" aria-pressed="false"
+                  title="Click to play / pause · drag or scroll to set volume">
+            <span class="knob-face" id="knob-face"><span class="tick"></span></span>
+          </button>
+          <button class="pill-btn" id="next" type="button" aria-label="Next track">
+            <svg viewBox="0 0 16 16"><rect x="11.1" y="3.2" width="1.9" height="9.6" rx=".5"/><path d="M3.4 3.6v8.8a.6.6 0 0 0 .93.5l6.07-4.4a.6.6 0 0 0 0-1L4.33 3.1a.6.6 0 0 0-.93.5z"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───────────── Bottom sheet (new playlist, rename, add songs) ───────────── -->
+    <div class="sheet-layer" id="sheet" hidden>
+      <div class="sheet-backdrop" data-close></div>
+      <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" tabindex="-1">
+        <span class="sheet-grip" aria-hidden="true"></span>
+        <h2 class="sheet-title" id="sheet-title"></h2>
+        <div class="sheet-body" id="sheet-body"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/tracks.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/taste.js"></script>
+  <script src="js/pages.js"></script>
+  <script src="js/playlists.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
