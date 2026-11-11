@@ -24,7 +24,8 @@
     return {
       id: t.id, sid: t.sid, title: t.title, artist: t.artist, album: t.album,
       duration: t.duration, art: t.art, artSmall: t.artSmall, src: t.src,
-      language: t.language, artistIds: t.artistIds
+      language: t.language, artistIds: t.artistIds,
+      albumId: t.albumId, year: t.year, playCount: t.playCount, explicit: t.explicit
     };
   }
 

@@ -1,6 +1,7 @@
 /* Thin client for the JioSaavn API (sumitkolhe/jiosaavn-api).
    Every song is mapped to the player's track shape:
-   { id, sid, title, artist, album, duration, art, artSmall, src } */
+   { id, sid, title, artist, album, duration, art, artSmall, src }
+   plus what the recommender reads: albumId, year, playCount, explicit. */
 (function () {
   'use strict';
 
@@ -42,6 +43,10 @@
       language: s.language || '',
       artistIds: primary.slice(0, 2).map(function (a) { return a.id; }),
       duration: Number(s.duration) || 0,
+      albumId: (s.album && s.album.id) || '',
+      year: s.year ? String(s.year) : '',
+      playCount: Number(s.playCount) || 0,
+      explicit: !!s.explicitContent,
       art: https(pick(s.image, '500x500')),
       artSmall: https(pick(s.image, '150x150')),
       src: https(src)
@@ -124,6 +129,30 @@
       .then(function (d) { return clean(d && d.songs); });
   }
 
+  // An album's songs (for a film soundtrack: the rest of the film's songs).
+  function album(id) {
+    return get('/albums?id=' + encodeURIComponent(id)).then(function (d) { return clean(d && d.songs); });
+  }
+
+  // Playlists matching a phrase: [{ id, name, count, language }]
+  function searchPlaylists(query, limit) {
+    return get('/search/playlists?query=' + encodeURIComponent(query) + '&limit=' + (limit || 5)).then(function (d) {
+      return ((d && d.results) || []).map(function (p) {
+        return { id: String(p.id), name: decode(p.name), count: Number(p.songCount) || 0, language: p.language || '' };
+      });
+    });
+  }
+
+  // An artist's details; similarArtists is often empty, so callers treat it as a bonus.
+  function artist(id) {
+    return get('/artists/' + encodeURIComponent(id)).then(function (d) {
+      return {
+        id: String(id), name: decode(d && d.name),
+        similar: ((d && d.similarArtists) || []).map(function (a) { return { id: String(a.id), name: decode(a.name) }; })
+      };
+    });
+  }
+
   // A configured source: its playlist, falling back to its search query.
   function collection(source, limit) {
     source = source || {};
@@ -141,6 +170,7 @@
 
   window.MusicAPI = {
     searchSongs: searchSongs, playlist: playlist, playlistInfo: playlistInfo,
-    artistSongs: artistSongs, collection: collection
+    artistSongs: artistSongs, collection: collection,
+    album: album, searchPlaylists: searchPlaylists, artist: artist
   };
 })();

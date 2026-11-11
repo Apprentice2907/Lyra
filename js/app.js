@@ -9,9 +9,11 @@
   var list = [];                       // tracks on the Explore wheel
   var N = 0;
   var queue = [];                      // what next / previous step through
+  var queueSource = 'list';            // where the queue came from (search, home0, saved, playlist, explore, encore)
   var userPlayed = false;
   var engine = new window.VinylPlayer();
   var saved = new window.SavedStore();
+  var encore = null;                   // next-song recommender (js/encore), created at boot
 
   var $ = function (id) { return document.getElementById(id); };
   var device = $('app');
@@ -303,17 +305,20 @@
   }
 
   // Play track i of a list (it becomes the queue) and open Now Playing.
-  function playFrom(tracks, i) {
+  function playFrom(tracks, i, source) {
     var t = tracks[i];
     if (!t) return;
     queue = tracks.slice();
+    queueSource = source || 'list';
     userPlayed = true;
-    if (!sameTrack(engine.track, t)) engine.load(t, true);
-    else if (!engine.playing) engine.play();
+    if (!sameTrack(engine.track, t)) {
+      if (encore) encore.note('pick', queueSource);
+      engine.load(t, true);
+    } else if (!engine.playing) engine.play();
     openPlaying();
   }
 
-  function openTrack(i) { playFrom(list, i); }
+  function openTrack(i) { playFrom(list, i, 'explore'); }
 
   function onPlayButton(i) {
     if (sameTrack(engine.track, list[i]) && engine.playing) { engine.pause(); return; }
@@ -642,11 +647,48 @@
     return engine.track ? [engine.track] : [];
   }
 
+  /* What plays next. Your own ordered lists (liked songs, playlists) play in
+     order; everything else — search, Home, Explore, Encore's own picks — and
+     the end of any list get Encore's next song (when Smart next is on). */
+  var ORDERED = { saved: true, playlist: true };
+
+  function upcoming() {
+    var q = currentQueue(), i = indexIn(q, engine.track);
+    var inOrder = ORDERED[queueSource] && q.length > 1 && i >= 0 && i < q.length - 1;
+    if (!inOrder && encore && encore.settings.smart && engine.track && !engine.track.music) {
+      var p = encore.peek();
+      if (p && p.t) return { t: p.t, encore: true, back: !!p.back };
+      // no pick yet (first seconds, slow network): the first song from your last list not heard this session
+      var heard = encore.session.ids;
+      for (var k = 0; i < 0 && k < queue.length; k++) {
+        if (heard.indexOf(queue[k].id) < 0 && !sameTrack(queue[k], engine.track)) return { t: queue[k], encore: false };
+      }
+    }
+    return q.length > 1 ? { t: q[mod(i + 1, q.length)], encore: false } : null;
+  }
+
+  // reason: 'next' (the button) or 'auto' (the song ended)
+  function advance(reason) {
+    var nx = upcoming();
+    if (!nx) return false;
+    var t = nx.encore ? encore.next() : nx.t;
+    if (!t) return false;
+    if (nx.encore) queueSource = 'encore';
+    if (encore) encore.note(reason, queueSource);
+    engine.load(t, reason === 'auto' || engine.playing);
+    return true;
+  }
+
   function step(dir) {
     if (dir < 0 && engine.position() > 3) { engine.seek(0); return; }
+    if (dir > 0) { if (!advance('next')) engine.seek(0); return; }
+    // back through what you actually heard, then through the list
+    var back = encore && encore.previous();
+    if (back) { encore.note('prev', queueSource); engine.load(back, engine.playing); return; }
     var q = currentQueue(), i = indexIn(q, engine.track);
     if (q.length < 2) { engine.seek(0); return; }
-    engine.load(q[mod(i + dir, q.length)], engine.playing);
+    if (encore) encore.note('prev', queueSource);
+    engine.load(q[mod(i - 1, q.length)], engine.playing);
   }
 
   function updateConsole(dt, now, p, pos, dur) {
@@ -723,10 +765,7 @@
   engine.on('track', syncNpSave);
   saved.on(syncNpSave);
 
-  engine.on('ended', function () {
-    var q = currentQueue(), i = indexIn(q, engine.track);
-    if (q.length > 1) engine.load(q[mod(i + 1, q.length)], true);
-  });
+  engine.on('ended', function () { advance('auto'); });
 
   engine.on('error', function () {
     flashMsg = 'UNAVAILABLE';
@@ -865,11 +904,21 @@
     if (!userPlayed && engine.track && engine.track.music && !engine.playing) engine.load(res.tracks[0], false);
   }
 
+  // Explore: Encore's songs for right now once it knows you, else the taste mix
+  function exploreSignature() {
+    var s = window.VinylTaste.signature(saved);
+    if (encore && encore.prof.n >= 5) s += '|e' + window.EncoreProfile.context(Date.now()).block;
+    return s;
+  }
+
   function refreshExplore() {
-    var sig = window.VinylTaste.signature(saved);
+    var sig = exploreSignature();
     if (exploreBusy || sig === exploreSig) return;
     exploreBusy = true;
-    window.VinylTaste.build(saved, cfg).then(function (res) {
+    var mix = encore
+      ? encore.forNow(24).catch(function () { return window.VinylTaste.build(saved, cfg); })
+      : window.VinylTaste.build(saved, cfg);
+    mix.then(function (res) {
       exploreSig = sig;
       if (exploreVisible() && N) pendingExplore = res;     // don't swap the wheel under you
       else applyExplore(res);
@@ -878,7 +927,7 @@
     }).then(function () {
       exploreBusy = false;
       wheelStatus.hidden = true;
-      if (window.VinylTaste.signature(saved) !== exploreSig) scheduleExplore();
+      if (exploreSignature() !== exploreSig) scheduleExplore();
     });
   }
 
@@ -904,6 +953,9 @@
 
   engine.load(DEMO[DEMO.initialTrack || 0], false);
   renderKnob();
+  if (window.Encore) {
+    try { encore = window.Encore.init({ engine: engine, saved: saved }); } catch (e) { encore = null; if (window.console) console.error('[encore] off:', e); }
+  }
   refreshExplore();
 
   ctx.engine = engine;
@@ -912,8 +964,18 @@
   ctx.playFrom = playFrom;
   ctx.openOverlay = openOverlay;
   ctx.closeOverlay = closeOverlay;
+  ctx.encore = encore;
+  ctx.peekNext = upcoming;
+  ctx.playUpNow = function () {
+    var t = encore && encore.next();
+    if (!t) return;
+    queueSource = 'encore';
+    encore.note('next', 'encore');
+    engine.load(t, true);
+  };
   var ui = window.VinylPages.init(ctx);
   window.VinylPlaylists.init(ctx, ui);
+  if (encore && window.EncoreUI) window.EncoreUI.init(ctx, encore);
 
   if (window.ResizeObserver) new ResizeObserver(layout).observe(device);
   window.addEventListener('resize', layout);

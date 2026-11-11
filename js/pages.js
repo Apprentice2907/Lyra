@@ -123,7 +123,7 @@
         if (e.target.closest('.remove')) { if (opts.onRemove) leave(item, function () { opts.onRemove(t); }); return; }
         if (e.target.closest('.add')) { if (opts.onAdd) opts.onAdd(t, item); return; }
         if (opts.onPick) { opts.onPick(t, item); return; }
-        ctx.playFrom(tracks, i);
+        ctx.playFrom(tracks, i, ul.dataset.list);
       });
     }
 

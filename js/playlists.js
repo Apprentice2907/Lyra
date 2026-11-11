@@ -198,7 +198,7 @@
 
     $('pl-play').addEventListener('click', function () {
       var tracks = curTracks();
-      if (tracks.length) ctx.playFrom(tracks, 0);
+      if (tracks.length) ctx.playFrom(tracks, 0, 'playlist');
     });
     $('pl-add').addEventListener('click', function () { openAddSheet(); });
     $('pl-more').addEventListener('click', function () { optionsSheet(); });
@@ -250,6 +250,7 @@
 
     layer.addEventListener('click', function (e) { if (e.target.closest('[data-close]')) closeSheet(); });
     ctx.closeSheet = closeSheet;
+    ctx.openSheet = openSheet;
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && !layer.hidden) { e.stopPropagation(); closeSheet(); }
     }, true);

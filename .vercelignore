@@ -1,3 +1,6 @@
 .claude
 .env*
 .gitignore
+tests
+tools
+docs
