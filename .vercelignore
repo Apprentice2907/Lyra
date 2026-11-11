@@ -1,6 +1,8 @@
 .claude
 .env*
 .gitignore
+.github
 tests
 tools
 docs
+README.md
