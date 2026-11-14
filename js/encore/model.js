@@ -260,9 +260,47 @@
 
   function dot(w, x) { var s = 0; for (var i = 0; i < D; i++) s += w[i] * x[i]; return s; }
 
+  /* ───────────── artist pacing ─────────────
+     The model scores one song at a time, and the next song by the same
+     artist is often a safe bet (a similar sound, an artist they love). Left
+     alone, Encore followed a song with the same artist a third of the time
+     in simulation. Real listeners do it 17% of the time when they choose for
+     themselves, and Yandex Music's recommender under 1% (Yambda logs,
+     docs/DATA.md). In those logs a same-artist follow-up is played through
+     about as often as any other, so repeating doesn't cost the next song;
+     what it costs is variety over weeks, which a per-song score can't see.
+
+     So how often to stay with an artist is a budget for the long run, not
+     part of the score:
+     - the target is how often this listener stays with an artist when they
+       choose for themselves (17% until they have, kept between 5% and 35%);
+     - a penalty λ on same-artist candidates rises while Encore's own picks
+       run above the target and relaxes below it (a Lagrange multiplier
+       updated online, as in constrained bandits; Agrawal & Devanur 2016).
+     Nothing is banned: a same-artist song that is clearly better still wins. */
+  var PACE = { target: 0.17, k: 20, min: 0.05, max: 0.35, eta: 0.05, lamMax: 2, keep: 0.995 };
+
+  function pacing(m) { return m.pace || (m.pace = { lam: 0, ownN: 0, ownS: 0, recN: 0, recS: 0 }); }
+
+  // how often this listener stays with an artist when choosing for themselves
+  function paceTarget(m) {
+    var p = pacing(m);
+    return clamp((p.ownS + PACE.target * PACE.k) / (p.ownN + PACE.k), PACE.min, PACE.max);
+  }
+
+  // after a play that follows a different song in the same session
+  function pace(m, same, own) {
+    var p = pacing(m), s = same ? 1 : 0;
+    if (own) { p.ownN = p.ownN * PACE.keep + 1; p.ownS = p.ownS * PACE.keep + s; return; }
+    p.recN = p.recN * PACE.keep + 1; p.recS = p.recS * PACE.keep + s;
+    p.lam = clamp(p.lam + PACE.eta * (s - paceTarget(m)), 0, PACE.lamMax);
+  }
+
   /* ───────────── ranking ─────────────
-     rank(model, state, cands, opts) → { list, w, mu }
-       list: [{ cand, x, score (sampled), mean (expected reward), prop }]
+     rank(model, state, cands, opts) → { list, w, mu, lam }
+       list: [{ cand, x, score (sampled), mean (expected reward), pen, prop }]
+       pen is the artist-pacing penalty on this song (λ if it's by the
+       artist playing now, else 0); it counts in score, safety and prop.
      opts.rng      random source (Math.random by default)
      opts.w        reuse a weight draw (re-ranking the same decision when
                    audio features arrive must not re-roll the dice)
@@ -270,17 +308,19 @@
      opts.margin   safe exploration: only songs whose expected reward is
                    within this margin of the best may be picked, so a
                    random draw can never choose a clearly worse song
-                   (in the spirit of conservative bandits, Wu et al. 2016) */
+                   (in the spirit of conservative bandits, Wu et al. 2016)
+     opts.pace     false: no artist pacing (for comparisons) */
   function rank(m, state, cands, opts) {
     opts = opts || {};
     var rng = opts.rng || Math.random, mu = mean(m), w = opts.w || sample(m, rng, mu);
+    var lam = opts.pace === false ? 0 : pacing(m).lam;
     var list = cands.map(function (c) {
-      var x = c.x || featurize(state, c);
-      return { cand: c, x: x, score: dot(w, x), mean: dot(mu, x), prop: 0, safe: true };
+      var x = c.x || featurize(state, c), pen = lam * x[IDX.sameArtist];
+      return { cand: c, x: x, score: dot(w, x) - pen, mean: dot(mu, x), pen: pen, prop: 0, safe: true };
     });
     if (opts.margin != null && list.length) {
-      var bestMean = Math.max.apply(null, list.map(function (it) { return it.mean; }));
-      list.forEach(function (it) { it.safe = it.mean >= bestMean - opts.margin; });
+      var bestMean = Math.max.apply(null, list.map(function (it) { return it.mean - it.pen; }));
+      list.forEach(function (it) { it.safe = it.mean - it.pen >= bestMean - opts.margin; });
     }
     list.sort(function (a, b) { return (b.safe - a.safe) || (b.score - a.score); });
     var draws = opts.draws == null ? 32 : opts.draws;
@@ -288,13 +328,13 @@
       var wins = new Array(list.length).fill(0);
       for (var d = 0; d < draws; d++) {
         var wd = sample(m, rng, mu), best = 0, bs = -Infinity;
-        for (var i = 0; i < list.length; i++) { if (!list[i].safe) continue; var s = dot(wd, list[i].x); if (s > bs) { bs = s; best = i; } }
+        for (var i = 0; i < list.length; i++) { if (!list[i].safe) continue; var s = dot(wd, list[i].x) - list[i].pen; if (s > bs) { bs = s; best = i; } }
         wins[best]++;
       }
       // smoothed so no logged propensity is ever exactly 0
       list.forEach(function (it, i) { it.prop = round((wins[i] + 0.5) / (draws + 0.5 * list.length), 4); });
     }
-    return { list: list, w: w, mu: mu };
+    return { list: list, w: w, mu: mu, lam: lam };
   }
 
   /* Why a song was picked, in plain words: the features that pushed its
@@ -326,11 +366,14 @@
 
   // compact for storage: 4 decimals is plenty
   function serialize(m) {
-    return { v: m.v, d: m.d, names: m.names, lambda: m.lambda, gamma: m.gamma, explore: m.explore, noise: m.noise, n: m.n,
+    var out = { v: m.v, d: m.d, names: m.names, lambda: m.lambda, gamma: m.gamma, explore: m.explore, noise: m.noise, n: m.n,
       A: m.A.map(function (v) { return round(v, 5); }), b: m.b.map(function (v) { return round(v, 5); }) };
+    if (m.pace) out.pace = { lam: round(m.pace.lam), ownN: round(m.pace.ownN, 2), ownS: round(m.pace.ownS, 2), recN: round(m.pace.recN, 2), recS: round(m.pace.recS, 2) };
+    return out;
   }
 
   return {
+    pace: pace, paceTarget: paceTarget, pacing: pacing, PACE: PACE,
     VERSION: VERSION, D: D, FEATURES: FEATURES, IDX: IDX,
     featurize: featurize, create: create, valid: valid, update: update, mean: mean, sample: sample,
     rank: rank, explain: explain, weights: weights, serialize: serialize, prior: prior, dot: dot

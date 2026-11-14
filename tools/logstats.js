@@ -38,6 +38,7 @@ function Acc() {
   this.afterSkip = [0, 0]; this.afterThrough = [0, 0];               // [plays, through]
   this.repeat = [0, 0]; this.first = [0, 0];
   this.sameArtist = [0, 0]; this.newArtist = [0, 0];
+  this.artistBy = { pick: [0, 0], rec: [0, 0] };                    // [follow-ups, same artist], replays left out
   this._last = {};                                                   // per user: previous play
   this._heard = {};                                                  // per user: tracks heard
 }
@@ -80,13 +81,14 @@ Acc.prototype.add = function (r) {
     s[0]++; s[1] += t;
     se.trans++;
     if (same) se.same++;
+    if (!r.replay && r.tid !== prev.tid) { var ab = this.artistBy[r.how === 'pick' ? 'pick' : 'rec']; ab[0]++; if (same) ab[1]++; }
   }
   var heard = this._heard[uid] || (this._heard[uid] = {});
   var rep = heard[r.tid] ? this.repeat : this.first;
   rep[0]++; rep[1] += t;
   if (heard[r.tid]) se.rep++;
   heard[r.tid] = 1;
-  this._last[uid] = { sess: r.sess, skip: sk, artists: r.artists || [] };
+  this._last[uid] = { sess: r.sess, skip: sk, artists: r.artists || [], tid: r.tid };
 };
 
 function rate(pair) { return pair[0] ? pair[1] / pair[0] : null; }
@@ -125,6 +127,8 @@ Acc.prototype.result = function () {
     repeatShare: this.repeat[0] / (this.n || 1), throughRepeat: rate(this.repeat), throughFirst: rate(this.first),
     sameArtistShare: (this.sameArtist[0]) / ((this.sameArtist[0] + this.newArtist[0]) || 1),
     throughSameArtist: rate(this.sameArtist), throughNewArtist: rate(this.newArtist),
+    sameArtistOwn: this.artistBy.pick[0] ? this.artistBy.pick[1] / this.artistBy.pick[0] : null,
+    sameArtistRec: this.artistBy.rec[0] ? this.artistBy.rec[1] / this.artistBy.rec[0] : null,
     userThroughP10: q(userRates, 0.1), userThroughP50: q(userRates, 0.5), userThroughP90: q(userRates, 0.9),
     sessAllOwn: share(function (s) { return s.own === s.n; }), sessAllRec: share(function (s) { return s.own === 0; }),
     sessNoSameArtist: share(function (s) { return s.same === 0; }), sessNoFastSkip: share(function (s) { return s.fast === 0; }),
@@ -164,6 +168,7 @@ var ROWS = [
   ['through after a skip', 'throughAfterSkip', 'pct'], ['through after a full listen', 'throughAfterThrough', 'pct'],
   ['repeat listens', 'repeatShare', 'pct'], ['through, repeat', 'throughRepeat', 'pct'], ['through, first listen', 'throughFirst', 'pct'],
   ['same artist as previous', 'sameArtistShare', 'pct'], ['through, same artist', 'throughSameArtist', 'pct'],
+  ['same artist, own (no replays)', 'sameArtistOwn', 'pct'], ['same artist, recs (no replays)', 'sameArtistRec', 'pct'],
   ['likes per play', 'likeRate', 'pct'], ['dislikes per play', 'dislikeRate', 'pct'], ['replays per play', 'replayRate', 'pct'],
   ['listener through, p10', 'userThroughP10', 'pct'], ['listener through, median', 'userThroughP50', 'pct'], ['listener through, p90', 'userThroughP90', 'pct'],
   ['sessions: all own choices', 'sessAllOwn', 'pct'], ['sessions: all recommended', 'sessAllRec', 'pct'],

@@ -114,6 +114,10 @@ All statistics fade with a 45-day half-life, so the profile follows you when you
 - **Propensity logging:** every Encore pick stores how likely this policy was to choose it (32 extra draws), so exported logs support off-policy evaluation (IPS, doubly robust) later.
 - **Explanations:** the features that raised a pick's expected reward the most, in plain words ("Flows smoothly from this song", "Fits your night mood"). Picks made by exploring say so: "Trying something new for you".
 - **Learning weights:** Encore's own picks 1.0; songs you chose yourself 0.5, with a `userChosen` feature that absorbs the selection bias; playlist order 0.7.
+- **Artist pacing.** The model scores one song at a time, and the next song by the same artist is often a safe bet. Left alone, Encore stayed with the artist a third of the time in simulation. Real listeners do that 17% of the time when choosing for themselves, and Yandex Music's recommender under 1% (see [DATA.md](DATA.md)).
+  - How often to stay with an artist is a budget for the long run, not part of the score. The target is how often *you* stay with an artist when you pick songs yourself: 17% to start, kept between 5% and 35%.
+  - A penalty on same-artist songs rises while Encore runs above the target and relaxes below it: a Lagrange multiplier updated online, as in constrained bandits (Agrawal & Devanur 2016).
+  - A clearly better song by the same artist still wins. When pacing changes the pick, the first reason says "A change of artist". The penalty counts in the logged propensities, and each record stores it (`rec.lam`).
 
 ## 7. Where the candidates come from
 
@@ -215,6 +219,7 @@ python tools/compare_librosa.py <work-dir>
 - Agrawal & Goyal (2013), *Thompson Sampling for Contextual Bandits with Linear Payoffs*
 - Chapelle & Li (2011), *An Empirical Evaluation of Thompson Sampling*
 - Wu, Shariff, Lattimore & Szepesvári (2016), *Conservative Bandits*
+- Agrawal & Devanur (2016), *Linear Contextual Bandits with Knapsacks*, NeurIPS (artist pacing)
 - Fitzgerald (2010), *Harmonic/Percussive Separation Using Median Filtering*
 - Krumhansl (1990), *Cognitive Foundations of Musical Pitch* (key profiles)
 - Gabrielsson & Lindström (2010), *The role of structure in the musical expression of emotions*

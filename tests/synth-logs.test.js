@@ -79,4 +79,15 @@ test('statistics: definitions on a hand-made log', function () {
   assert.equal(s.throughAfterSkip, 1 / 2);
   assert.equal(s.sessHist[0], 1 / 2, 'one single-song session out of two');
   assert.equal(s.sameArtistShare, 1);
+
+  // same-artist follow-ups, split into own choices and recommendations, replays left out
+  var mix = LS.statsOfPlays([
+    p({ tid: 'x1', sess: 'm', pos: 0, heard: 200, end: 'ended', how: 'pick' }),
+    p({ tid: 'x2', sess: 'm', pos: 1, heard: 200, end: 'ended', artists: ['a2'] }),
+    p({ tid: 'x3', sess: 'm', pos: 2, heard: 200, end: 'ended', artists: ['a2'] }),
+    p({ tid: 'x3', sess: 'm', pos: 3, heard: 200, end: 'ended', artists: ['a2'], replay: true }),
+    p({ tid: 'x4', sess: 'm', pos: 4, heard: 200, end: 'ended', artists: ['a3'], how: 'pick' })
+  ]);
+  assert.equal(mix.sameArtistRec, 1 / 2);
+  assert.equal(mix.sameArtistOwn, 0);
 });

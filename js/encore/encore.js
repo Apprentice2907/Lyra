@@ -153,7 +153,7 @@
 
     if (this.up && this.up.t.id === t.id && (rec.how === 'next' || rec.how === 'auto')) {
       rec.how = 'encore';
-      rec.rec = { prop: this.up.prop, rank: this.up.rank, n: this.up.n, src: src, mean: round4(this.up.item.mean), explore: this.up.exploring };
+      rec.rec = { prop: this.up.prop, rank: this.up.rank, n: this.up.n, src: src, mean: round4(this.up.item.mean), explore: this.up.exploring, lam: round4(this.up.lam || 0) };
     }
 
     if (rec.how === 'pick') this.forward = [];
@@ -205,6 +205,8 @@
       // explicit picks and playlist order are the listener's choice, not ours: learn from them more gently
       var w = rec.how === 'pick' ? 0.5 : (rec.how === 'auto' && (rec.src === 'playlist' || rec.src === 'saved')) ? 0.7 : 1;
       M.update(this.model, x, rw.r, w);
+      // artist pacing: how often this listener stays with an artist, and how often Encore just did
+      if (rec.pos > 0 && !rec.replay && (rec.how === 'pick' || rec.how === 'encore')) M.pace(this.model, x[M.IDX.sameArtist] > 0, rec.how === 'pick');
     }
     this.lastLearn = { title: rec.title, r: rw.r, parts: rw.parts, at: Date.now() };
 
@@ -360,12 +362,16 @@
     // did it win on what we know, or on the random draw? (rank by expected reward)
     var byMean = res.list.slice().sort(function (a, b) { return b.mean - a.mean; });
     var meanRank = byMean.indexOf(top);
-    // exploring = picked although clearly below the best guess (near-ties are not exploration)
-    var exploring = byMean[0].mean - top.mean > 0.05;
-    var ctx = P.context(Date.now());
+    // exploring = picked although clearly below the best guess (near-ties are not exploration);
+    // the best guess counts the artist-pacing penalty, so a change of artist isn't called exploring
+    var best = Math.max.apply(null, res.list.map(function (it) { return it.mean - (it.pen || 0); }));
+    var exploring = best - (top.mean - (top.pen || 0)) > 0.05;
+    var reasons = M.explain(top, res.mu, P.context(Date.now()), exploring);
+    // pacing chose another artist over a song by this one that scored higher
+    if (!top.pen && byMean[0].pen && byMean[0].mean - top.mean > 0.05) reasons.unshift('A change of artist');
     this.up = {
       t: top.cand.t, item: top, prop: top.prop, rank: meanRank, n: res.list.length, exploring: exploring,
-      reasons: M.explain(top, res.mu, ctx, exploring), feat: top.cand.feat
+      reasons: reasons, feat: top.cand.feat, lam: res.lam
     };
     this._emit('up');
   };

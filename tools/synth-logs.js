@@ -3,6 +3,7 @@
    node tools/synth-logs.js [--users 500] [--days 21] [--warmup 30] [--seed 3]
                             [--policy encore|proxy] [--params data/synthetic/params.json]
                             [--out data/synthetic/plays.jsonl] [--exports data/synthetic/exports]
+                            [--no-pace]   (Encore without artist pacing, for comparisons)
    node tools/synth-logs.js --calibrate data/public/yambda/stats.json [--rounds 6]
                             [--cal-users 200] [--cal-days 14] [--warmup 30]
                             [--save data/synthetic/params.json]
@@ -324,10 +325,10 @@ function simulateUser(u, th, cat, opts, r, emit) {
           if (!cands.length) { song = ownChoice(u, th, cat, r, cur, false); how = 'pick'; src = 'organic'; }
           else if (enc) {
             stateAt = { ctx: ctx, prof: prof, cur: cur ? cur.t : null, curFeat: cur ? cur.feat : null, session: ses, liked: function () { return false; }, inPlaylist: function () { return false; }, mode: 'auto' };
-            var res = M.rank(model, stateAt, cands, { rng: r, draws: opts.draws, margin: 0.1 });
+            var res = M.rank(model, stateAt, cands, { rng: r, draws: opts.draws, margin: 0.1, pace: opts.pace !== false });
             var top = res.list[0];
             song = top.cand.s; cand = top.cand; x0 = top.x; how = 'encore'; src = 'rec';
-            recInfo = { prop: top.prop, rank: res.list.slice().sort(function (a, b) { return b.mean - a.mean; }).indexOf(top), n: res.list.length, src: top.cand.src };
+            recInfo = { prop: top.prop, rank: res.list.slice().sort(function (a, b) { return b.mean - a.mean; }).indexOf(top), n: res.list.length, src: top.cand.src, lam: Math.round(res.lam * 1e4) / 1e4 };
           } else {
             // proxy: softmax over the listener's true utility, steering away from the artist just played
             var us = cands.map(function (c) {
@@ -385,6 +386,7 @@ function simulateUser(u, th, cat, opts, r, emit) {
               liked: function () { return false; }, inPlaylist: function () { return false; }, mode: 'auto' }, { t: song.t, feat: song.feat, chosen: 1 });
             M.update(model, xs, rw.r, 0.5);
           }
+          if (opts.pace !== false && cur && !rec.replay) M.pace(model, cur.a === song.a, how === 'pick');
         }
 
         var skipped = LS.isSkip(rec);
@@ -508,7 +510,7 @@ if (require.main === module) {
     var exportsDir = o.exports === true ? path.join(root, 'exports') : o.exports;
     if (exportsDir) fs.mkdirSync(exportsDir, { recursive: true });
     var userPlays = [];
-    generate({ users: users, days: days, seed: seed, start: start, policy: policy, draws: +(o.draws || 16), warmup: +(o.warmup || 30),
+    generate({ users: users, days: days, seed: seed, start: start, policy: policy, draws: +(o.draws || 16), warmup: +(o.warmup || 30), pace: !o['no-pace'],
       onUser: function (u, res) {
         if (exportsDir) {
           fs.writeFileSync(path.join(exportsDir, u.id + '.json'), JSON.stringify({

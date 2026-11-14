@@ -12,6 +12,8 @@ research/yambda_fetch.py      real histories from Yambda (reads only the parts i
 research/yambda_to_encore.py  → Encore play records (data/public/yambda/plays.jsonl)
 tools/logstats.js             the same behaviour statistics for any log
 tools/synth-logs.js           synthetic listeners: calibrate to real stats, then generate
+tools/compare-runs.js         two runs of the same synthetic listeners, compared listener by listener
+tools/artist-repeats.js       is a song by the artist just played heard through more or less often?
 research/two_sample_test.py   can a classifier tell real sessions from synthetic ones?
 ```
 
@@ -129,25 +131,29 @@ These are 500 synthetic listeners the calibration never saw (seed 3), with a 30-
 
 | | Real (Yambda) | Synthetic, proxy recommender | Synthetic, Encore |
 |---|---|---|---|
-| Played through | 59.3% | 62.7% | 55.8% |
-| Skips in the first 10 s / 30 s | 57.9% / 71.9% | 62.0% / 69.6% | 64.9% / 72.0% |
-| Through after a skip / after a full listen | 25.1% / 83.7% | 23.2% / 87.4% | 20.2% / 85.3% |
-| Songs per session: mean / median / p90 | 19 / 10 / 44 | 19 / 12 / 45 | 20 / 12 / 46 |
-| Own choices | 50.2% | 52.6% | 52.3% |
-| Through: own choice / recommended | 55.2% / 63.4% | 56.5% / 69.5% | 52.3% / 59.7% |
-| Repeat listens | 56.5% | 58.5% | 54.3% |
-| Same artist as the song before | 11.9% | 10.6% | **25.9%** |
-| Listeners played through (10th / 50th / 90th percentile) | 19 / 64 / 88% | 21 / 65 / 92% | 15 / 54 / 88% |
-| Sessions all own picks / all recommended | 40.9% / 33.8% | 45.6% / 32.8% | 45.4% / 34.6% |
+| Played through | 59.3% | 62.7% | 55.4% |
+| Skips in the first 10 s / 30 s | 57.9% / 71.9% | 62.0% / 69.6% | 64.8% / 71.8% |
+| Through after a skip / after a full listen | 25.1% / 83.7% | 23.2% / 87.4% | 20.3% / 85.0% |
+| Songs per session: mean / median / p90 | 19 / 10 / 44 | 19 / 12 / 45 | 19 / 12 / 46 |
+| Own choices | 50.2% | 52.6% | 51.1% |
+| Through: own choice / recommended | 55.2% / 63.4% | 56.5% / 69.5% | 52.2% / 58.7% |
+| Repeat listens | 56.5% | 58.5% | 53.5% |
+| Same artist as the song before | 11.9% | 10.6% | **16.7%** (25.7% before artist pacing) |
+| Listeners played through (10th / 50th / 90th percentile) | 19 / 64 / 88% | 21 / 65 / 92% | 14 / 55 / 89% |
+| Sessions all own picks / all recommended | 40.9% / 33.8% | 45.6% / 32.8% | 45.5% / 34.9% |
+
+The Encore column uses Encore with artist pacing, which is now the default (see the research findings below).
 
 **Spread.** Four fresh populations of 500 (same catalogue, different listeners) land at 59.6–62.8% played through, against 59.3% real. That's the honest error bar on these numbers.
 
-**The classifier test still tells sessions apart** (`research/two_sample_test.py`): ROC AUC **0.92** for the proxy world and **0.96** for the Encore world (0.5 would be indistinguishable). Each point of the AUC comes from what the test lists as giveaways, in order:
+**The classifier test still tells sessions apart** (`research/two_sample_test.py`): ROC AUC **0.92** for the proxy world and **0.94** for the Encore world (0.95 before artist pacing; 0.5 would be indistinguishable). Each point of the AUC comes from what the test lists as giveaways, in order:
 - Own-choice mixing inside sessions.
 - Repeat share per session.
 - How much of each song is heard.
 - Replay patterns.
 - Fast-skip concentration.
+
+In the Encore world, same-artist runs come first, ahead of all of these.
 
 So the synthetic data matches the averages and most distributions, but **real sessions are still more varied in their mix than simulated ones**. That's the next modelling step, not a solved problem.
 
@@ -163,13 +169,29 @@ So the synthetic data matches the averages and most distributions, but **real se
    - Fitted on 200, the gap was ~4 points. Overall satisfaction was then re-centred on a fresh population (seed 2), and the datasets above use a third, untouched one (seed 3).
    - The catalogue is now the same for every seed, so "fresh listeners" isn't confused with "a different catalogue".
 
-### A first research finding (in the synthetic world)
+### Research findings (in the synthetic world)
 
-Encore v1's recommendations are played through **59.7%** of the time. The reference recommender, which knows each listener's true taste, scores **69.5%**. Encore also follows a song with the **same artist 26%** of the time, more than twice what real listeners do (12%). Same-artist runs are also the classifier's top clue that Encore's sessions aren't real.
+**1. Encore repeated artists far more than people or a real recommender do.** Before artist pacing, 33% of Encore's recommendations were by the artist of the song before (replays left out). Real Yambda listeners do that in 17% of their own choices. Yandex Music's recommender does it in 0.7% of its recommendations. (`tools/logstats.js` reports both as *same artist, own* and *same artist, recs*.)
 
-Two concrete targets for the next research step:
-- **Diversify artists.** The `sameArtist` prior is +0.15, and the `artist` and `taste` sources feed many same-artist candidates.
-- **Close the gap to the reference recommender.** Measure progress with off-policy estimates checked against `truth.p`.
+**Does repeating an artist cost anything?** (`tools/artist-repeats.js`)
+- **Real logs: no effect we can detect.** A same-artist follow-up is played through about as often as any other song. Comparing within each listener's own choices, the difference is −1.8 ± 2.8 points (132 listeners, 95% interval). Yandex's recommender repeats an artist too rarely (723 times) to say anything about recommendations.
+- **The synthetic world rewards repeating.** Its same-artist follow-ups are played through *more*: +1.6 ± 1.3 points within each listener's own choices (proxy world, 421 listeners). Songs by one artist sound alike there, and smooth transitions are rewarded. So this world rewards repetition more than the real data supports.
+
+**Artist pacing** (in `js/encore/model.js`, explained in [ENCORE.md](ENCORE.md)) keeps Encore's same-artist share near how often each listener repeats artists themselves. The table below is the same 500 listeners (seed 3), simulated with and without pacing (`--no-pace`), then compared listener by listener with `tools/compare-runs.js`:
+
+| | Without pacing | With pacing | Change per listener (95%) |
+|---|---|---|---|
+| Recommendations by the same artist | 32.7% | 13.7% | −19.3 ± 1.1 points |
+| Recommendations played through | 60.3% | 58.7% | −1.3 ± 1.1 points |
+| True chance of playing it through (`truth.p`) | 81.7% | 81.2% | −0.6 ± 0.4 points |
+| All plays played through | 56.2% | 55.5% | −0.5 ± 0.8 points |
+| Classifier AUC, real vs synthetic sessions | 0.95 | 0.94 | |
+
+- **The cost is small, and it comes from this world's built-in reward for repetition**, which the real logs don't show.
+- **Same-artist runs are still the classifier's top giveaway.** Yandex's recommender almost never repeats an artist (0.7%), while Encore's target follows the listener's own choices (13–17%).
+- **The target is a design choice the logs can't settle.** A lower one is a one-line change (`PACE` in `model.js`).
+
+**2. Encore is still well below the reference recommender.** Its recommendations are played through **58.7%** of the time. The reference recommender, which knows each listener's true taste, scores **69.5%**. That gap is the next target. Measure progress with off-policy estimates checked against `truth.p`.
 
 ## 3. Spotify's Music Streaming Sessions Dataset (get it yourself)
 
