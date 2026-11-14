@@ -1,0 +1,6 @@
+# for research/*.py   (python -m pip install -r research/requirements.txt)
+pandas>=2.2
+pyarrow>=15
+fsspec>=2024.2
+aiohttp>=3.9
+scikit-learn>=1.4

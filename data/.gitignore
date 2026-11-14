@@ -1,0 +1,3 @@
+# downloaded and generated data stays on this machine
+*
+!.gitignore
